@@ -11,6 +11,8 @@ from sys import stderr
 
 import threading
 
+import json
+
 import youtube_dl
 #TODO auto-updater
 
@@ -112,6 +114,7 @@ def handlerFactory(player):
 
 class Player():
     listfile = ""
+    ljson = ""
     cachedir = None
     playlists = None
     ydl = None
@@ -128,8 +131,9 @@ class Player():
     dictlock = None
     file_to_title = None
 
-    def __init__(self, listfile, ydl, cachedir):
+    def __init__(self, listfile, ljson, ydl, cachedir):
         self.listfile = listfile
+        self.ljson = ljson
         self.playlists = {}
         self.ydl = ydl
         self.cachedir = cachedir
@@ -142,23 +146,34 @@ class Player():
         self.dictlock = threading.Lock()
         self.worker = False
         self.mpv = mpv.MPV(force_window=False, log_handler=print)
+        with open(ljson, 'r') as f:
+            self.playlists = json.load(f)
+
         with open(listfile, 'r') as f:
             for line in f:
-                self.resolve_listname(line)
-
-    def check_for_songfile(self, url):
-        return False
+                if not line in self.playlists:
+                    self.resolve_listname(line)
+        self.save_jsonfile()
 
     def resolve_listname(self, url):
-        self.save_listname(url, self.ydl.extract_info(url, download=False)['title'])
+        d = self.ydl.extract_info(url, download=False)
+        self.save_listname(url, d['title'], self.query_entries(d))
 
-    def save_listname(self, url, title):
-        self.playlists[url] = title
+    def query_entries(self, listdict):
+        titles = []
+        for video in listdict['entries']:
+            titles.append((video['title'], video['webpage_url'], self.ydl.prepare_filename(video)))
+            debug("playlist: " + video['title'] + "\t" + \
+                    video['webpage_url'] + "\t" + \
+                    self.ydl.prepare_filename(video))
+        return titles
 
-    def append_to_listfile(self, url, title):
-        with open(self.listfile, 'a') as f:
-            f.write(url)
-        self.save_listname(url, title)
+    def save_listname(self, url, title, videos):
+        self.playlists[url] = (title, videos)
+
+    def save_jsonfile(self):
+        with open(self.ljson, 'w') as f:
+            json.dump(self.playlists, f)
 
     def get_mpv_titles(self):
         r = []
@@ -251,23 +266,21 @@ class Player():
 
 
     def load_from_url(self, url, front=False):
+        if url in self.playlists:
+            (ptitle, pentries) = self.playlists[url]
+            self.add_to_queue(pentries, front)
+
+            return "bekannte playlist: \"" + ptitle + "\" hinzugefügt"
         try:
             yresult = self.ydl.extract_info(url, download=False)
             if 'entries' in yresult:
-                if not url in self.playlists:
-                    self.append_to_listfile(url, yresult['title'])
-
-                titles = []
-
-                for video in yresult['entries']:
-                    titles.append((video['title'],\
-                                   video['webpage_url'],\
-                                   self.ydl.prepare_filename(video)))
-                    debug("playlist: " + video['title'] + "\t" + \
-                          video['webpage_url'] + "\t" + \
-                          self.ydl.prepare_filename(video))
+                titles = query_entries(yresult)
                 self.add_to_queue(titles, front)
-                return "playlist " + yresult['title'] + " hinzugefügt"
+
+                self.save_listname(url, yresult['title'], titles)
+                self.save_jsonfile()
+
+                return "playlist \"" + yresult['title'] + "\" hinzugefügt"
 
             else:
                 video = yresult
@@ -276,7 +289,7 @@ class Player():
                 self.add_to_queue([(video['title'],\
                                     video['webpage_url'],\
                                     self.ydl.prepare_filename(video))], front)
-                return "video " + video['title'] + " hinzugefügt"
+                return "video \"" + video['title'] + "\" hinzugefügt"
 
         except youtube_dl.utils.DownloadError:
             return u"ungültiger link"
@@ -288,20 +301,25 @@ if __name__ == "__main__":
         serverPort = 8080
         cachedir = "/mnt/pi/usbcache/cachedir/"
         listfile = "/mnt/pi/usbcache/listfile"
+        ljson = "mnt/pi/usbcache/playlists.json"
     else:
         hostName = "localhost"
         serverPort = 8080
         cachedir = "cachedir/"
         listfile = "listfile"
+        ljson = "playlists.json"
 
     if(not isfile(listfile)):
         listfile = "/dev/null"
-        debug("using /dev/null for nonexisting listfile")
+        debug("using /dev/null for nonexisting legacy listfile")
+    if(not isfile(ljson)):
+        ljson = "/dev/null"
+        debug("using /dev/null for nonexisting playlist database")
     ydl = youtube_dl.YoutubeDL({'outtmpl': (cachedir + '%(id)s.%(ext)s'),\
                                 'format':'bestaudio', 'quiet':True})
 
-    player = Player(listfile, ydl, cachedir)
-    debug("player started with listfile " + player.listfile + " and cachedir " + cachedir)
+    player = Player(listfile, ljson, ydl, cachedir)
+    debug("player started with listfile " + player.listfile + ", playlist json " + ljson + " and cachedir " + cachedir)
 
     handler = handlerFactory(player)
     webServer = HTTPServer((hostName, serverPort), handler)
