@@ -7,7 +7,7 @@ from urllib.parse import parse_qs
 from collections import deque
 
 from os.path import isfile,isdir
-from sys import stderr
+from sys import stderr, exc_info
 
 import threading
 
@@ -79,22 +79,29 @@ def handlerFactory(player):
             if 'control' in responsedict:
                 debug(responsedict['control'])
                 cmd = responsedict['control']
-                if(cmd == ['play']):
-                    player.mpv.pause = False
-                    page = self.build_page("play")
-                elif(cmd == ['pause']):
-                    player.mpv.pause = True
-                    page = self.build_page("pause")
-                elif(cmd == ['vor']):
-                    if(player.mpv.playlist):
-                        player.mpv.playlist_next()
-                    page = self.build_page("vor")
-                elif(cmd == ['zurück']):
-                    if(player.mpv.playlist):
-                        player.mpv.playlist_prev()
-                    page = self.build_page("zurück")
-                else:
-                    page = self.build_page("unknown mpv command")
+                try:
+                    if(cmd == ['play']):
+                        player.mpv.pause = False
+                        page = self.build_page("play")
+                    elif(cmd == ['pause']):
+                        player.mpv.pause = True
+                        page = self.build_page("pause")
+                    elif(cmd == ['vor']):
+                        if(player.mpv.playlist):
+                            player.mpv.playlist_next()
+                        page = self.build_page("vor")
+                    elif(cmd == ['zurück']):
+                        if(player.mpv.playlist):
+                            player.mpv.playlist_prev()
+                        page = self.build_page("zurück")
+                    else:
+                        page = self.build_page("unbekannter Player-Befehl")
+                except SystemError as e:
+                    print(str(e))
+                    if(str(e).startswith("('Error running mpv command',")):
+                        page = self.build_page("kann nicht " + cmd[0])
+                    else:
+                        raise(e)
 
             elif ('link' in responsedict) and ('ytlnk' in responsedict):
                 debug(responsedict['link'][0] + " submitted link '"\
