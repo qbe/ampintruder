@@ -146,8 +146,9 @@ class Player():
         self.dictlock = threading.Lock()
         self.worker = False
         self.mpv = mpv.MPV(force_window=False, log_handler=print)
-        with open(ljson, 'r') as f:
-            self.playlists = json.load(f)
+        if (isfile(ljson)):
+            with open(ljson, 'r') as f:
+                self.playlists = json.load(f)
 
         with open(listfile, 'r') as f:
             for line in f:
