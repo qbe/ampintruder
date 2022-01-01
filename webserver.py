@@ -46,9 +46,12 @@ def handlerFactory(player):
                 string = string + "%s<br>\n" % t
             string = string + "</p>\n"
 
-            #for p in player.get_playlists():
-            #    string = string + "<p>" + p + "</p>\n"
+            string = string + mypage.playlist_spoiler_start
 
+            for url, value in player.get_playlists():
+                string = string + mypage.build_list_element(value[0], url)
+
+            string = string + mypage.playlist_spoiler_end
             string = string + mypage.html_end
             return string.encode("utf-8")
 
@@ -103,11 +106,15 @@ def handlerFactory(player):
                     else:
                         raise(e)
 
-            elif ('link' in responsedict) and ('ytlnk' in responsedict):
-                debug(responsedict['link'][0] + " submitted link '"\
+            elif ('link_back' in responsedict) and ('ytlnk' in responsedict):
+                debug(responsedict['link_back'][0] + " submitted link '"\
                     + responsedict['ytlnk'][0] + "'")
-                front = (responsedict['link'][0] == "jetzt abspielen")
-                result = player.load_from_url(responsedict['ytlnk'][0], front)
+                result = player.load_from_url(responsedict['ytlnk'][0], False)
+                page = self.build_page(result)
+            elif ('link_front' in responsedict) and ('ytlnk' in responsedict):
+                debug(responsedict['link_front'][0] + " submitted link '"\
+                    + responsedict['ytlnk'][0] + "'")
+                result = player.load_from_url(responsedict['ytlnk'][0], True)
                 page = self.build_page(result)
             else:
                 debug(responsedict)
@@ -194,7 +201,7 @@ class Player():
         return r
 
     def get_playlists(self):
-        return self.playlists.values()
+        return zip(self.playlists.keys(), self.playlists.values())
 
     def get_index_by_id(self, id):
         for index, d in enumerate(self.mpv.playlist):
@@ -223,7 +230,7 @@ class Player():
             self.queuelock.acquire()
             if self.front_queue:
                 cont = self.front_queue[-1]
-                item = cont[0].pop()
+                item = cont[0].pop(0)
                 if(not cont[0]):
                     self.front_queue.pop()
                 self.queuelock.release()
@@ -282,7 +289,7 @@ class Player():
         try:
             yresult = self.ydl.extract_info(url, download=False)
             if 'entries' in yresult:
-                titles = query_entries(yresult)
+                titles = self.query_entries(yresult)
                 self.add_to_queue(titles, front)
 
                 self.save_listname(url, yresult['title'], titles)
