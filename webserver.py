@@ -247,7 +247,10 @@ class Player():
                 if(cont[1] in self.seq_to_id):
                     index = self.get_index_by_id(self.seq_to_id[cont[1]])
                     self.mpv.playlist_move(len(self.mpv.playlist)-1,index + 1)
-                    self.seq_to_id[cont[1]] = self.mpv.playlist[index + 1]['id']
+                    try:
+                        self.seq_to_id[cont[1]] = self.mpv.playlist[index + 1]['id']
+                    except KeyError:
+                        debug("id field not in mpv playlist dicts")
                 else:
                     self.mpv.playlist_move(len(self.mpv.playlist)-1,0)
                     self.seq_to_id[cont[1]] = self.get_top_id()
