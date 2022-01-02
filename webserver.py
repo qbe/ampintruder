@@ -266,7 +266,7 @@ class Player():
         self.queuelock.acquire()
         if(front == True):
             self.front_seq = self.front_seq + 1
-            self.front_queue.append((item,self.front_seq))
+            self.front_queue.append((item.copy(),self.front_seq))
             #front queue contains lists to keep
             #order of playlists correct
         else:
