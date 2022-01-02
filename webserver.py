@@ -36,11 +36,14 @@ def handlerFactory(player):
             #TODO add mpv state
 
             string = string + mypage.song_list
+            string = string + "<p class=\"queued\">\n"
+            for l in player.get_queue_titles(True):
+                for t, u, c in l:
+                    string = string + "%s<br>\n" % t
             string = string + "<p class=\"loaded\">\n"
             for t in player.get_mpv_titles():
                 string = string + "%s<br>\n" % t
             string = string + "</p>\n"
-            #TODO add front_queue
             string = string + "<p class=\"queued\">\n"
             for t in player.get_queue_titles():
                 string = string + "%s<br>\n" % t
@@ -230,7 +233,13 @@ class Player():
             self.queuelock.acquire()
             if self.front_queue:
                 cont = self.front_queue[-1]
-                item = cont[0].pop(0)
+                try:
+                    item = cont[0].pop(0)
+                except IndexError:
+                    debug(self.front_queue)
+                    self.worker = False
+                    self.queuelock.release()
+                    return
                 if(not cont[0]):
                     self.front_queue.pop()
                 self.queuelock.release()
@@ -271,7 +280,7 @@ class Player():
         self.queuelock.acquire()
         try:
             if(front == True):
-                l = list(zip(list(zip(*self.front_queue))[0]))[0]
+                l = list(zip(*self.front_queue))[0]
             else:
                 l = list(zip(*self.back_queue))[0]
         except IndexError:
