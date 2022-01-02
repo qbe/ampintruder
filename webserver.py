@@ -214,7 +214,11 @@ class Player():
         return -1
 
     def get_top_id(self):
-        return self.mpv.playlist[0]['id']
+        try:
+            return self.mpv.playlist[0]['id']
+        except KeyError:
+            debug("id field not in mpv playlist dicts")
+            return -1
 
     def ytdl_or_file(self, item):
         debug("ytdl_or_file")
