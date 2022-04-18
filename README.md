@@ -15,7 +15,9 @@
 
 ## TODO
 
+* move item in queue
 * better UI
 * use youtube-dl through mpv (for instant play only ?)
 * update playlists
 * video support ?
+* auto-update youtube-dl via pip
